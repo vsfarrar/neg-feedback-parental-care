@@ -1,0 +1,146 @@
+---
+title: "Negative feedback to stress across parental care"
+author: "Victoria"
+date: "7/7/2018"
+output: html_document
+---
+
+```{r data_setup, echo=FALSE}
+library(ggplot2)
+library(gridExtra)
+library(car)
+library(tidyr)
+#import data into d_stress 
+d_stress<-read.csv((file.choose())) #stress_breeding_CORT_behavior.csv
+#trim excess NA's at bottom of csv file
+d_stress <- d_stress[ which(d_stress$nest_ID != "NA") , ]
+#remove excessive cort values / outliers
+d_stress <- d_stress[ which(d_stress$cort2 < 400) , ] 
+d_stress <- d_stress[ which(d_stress$cort3 < 90) , ] 
+
+#functions sourced from other scripts
+source("~/Documents/statistics/fxns/summarySE.R")
+source("~/Documents/statistics/fxns/summarySE_withinsubj.R")
+source("~/Documents/statistics/fxns/multiplot.R")
+
+```
+
+```{r wide to long}
+#convert data from wide to long, using tidyr
+dstress_long <- gather(d_stress, cort, conc, cort1:cort3, factor_key=TRUE)
+#gather(dataset, key(made from names of columns),name of new value column, names of source columns to convert, treat key column as a factor)
+
+#renaming cort treatments according to minutes taken
+levels(dstress_long$cort)[levels(dstress_long$cort)=="cort1"] <- "0"
+levels(dstress_long$cort)[levels(dstress_long$cort)=="cort2"] <- "30"
+levels(dstress_long$cort)[levels(dstress_long$cort)=="cort3"] <- "60"
+
+#sorting data frame by bird_id and then cort time point
+dstress_long <- dstress_long[order(dstress_long$bird_id, dstress_long$cort), ]
+```
+
+```{r stress series}
+#run summarySE.R function script first
+#summary statistics for dataset (used in line graphs)
+stats_period<-summarySE(dstress_long, measurevar="conc", groupvars=c("period","cort"))
+stats_sex<-summarySE(dstress_long, measurevar="conc", groupvars=c("sex","cort"))
+
+#within-subjects, repeated measures design, use different summary statistics function
+RMstat_period<- summarySEwithin(dstress_long, measurevar="conc", withinvars=c("period","cort"),
+                        idvar="bird_id", na.rm=TRUE, conf.interval=.95)
+RMstat_sex<- summarySEwithin(dstress_long, measurevar="conc", withinvars=c("sex","cort"),
+                        idvar="bird_id", na.rm=TRUE, conf.interval=.95)
+
+
+#subset data to look at period*sex interactions
+#for each period subset, summary statistics by sex
+early <- dstress_long[ which(dstress_long$period =='early_inc') , ] 
+RMstat_sexE<- summarySEwithin(early, measurevar="conc", withinvars=c("sex","cort"),
+                        idvar="bird_id", na.rm=TRUE, conf.interval=.95)
+
+late <- dstress_long[ which(dstress_long$period =='late_inc') , ] 
+RMstat_sexL<- summarySEwithin(late, measurevar="conc", withinvars=c("sex","cort"),
+                        idvar="bird_id", na.rm=TRUE, conf.interval=.95)
+
+chx <- dstress_long[ which(dstress_long$period =='chicks') , ] 
+RMstat_sexC<- summarySEwithin(chx, measurevar="conc", withinvars=c("sex","cort"),
+                        idvar="bird_id", na.rm=TRUE, conf.interval=.95)
+
+#GRAPHS
+pd<- position_dodge(0.1) # move them .05 to the left and right
+#line plot by period
+p1<-ggplot(RMstat_period, aes(x=cort, y=conc, colour=period, group=period)) + 
+    geom_errorbar(aes(ymin=conc-ci, ymax=conc+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylab("Cort (ng/uL)")+
+    xlab("Stress series time point") + theme_bw()
+
+#line plot by sex
+p2<-ggplot(RMstat_sex, aes(x=cort, y=conc, colour=sex, group=sex)) + 
+    geom_errorbar(aes(ymin=conc-ci, ymax=conc+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylab("Cort (ng/uL)")+
+    ylim(0,27.5)+ #normalizes axes so all graphs in multiplot have same y
+    xlab("Stress series time point") + ggtitle("All time points") + theme_bw()
+#early inc by sex
+p3<-ggplot(RMstat_sexE, aes(x=cort, y=conc, colour=sex, group=sex)) + 
+    geom_errorbar(aes(ymin=conc-ci, ymax=conc+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylim(0,27.5)+
+    ylab("Cort (ng/uL)")+ xlab("Stress series time point")+ ggtitle("Early incubation stress series") + theme_bw()
+#late inc by sex
+p4<-ggplot(RMstat_sexL, aes(x=cort, y=conc, colour=sex, group=sex)) + 
+    geom_errorbar(aes(ymin=conc-ci, ymax=conc+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylim(0,27.5)+
+     ylab("Cort (ng/uL)")+ xlab("Stress series time point")+ ggtitle("Late incubation stress series") + theme_bw()
+#chicks by sex
+p5<-ggplot(RMstat_sexC, aes(x=cort, y=conc, colour=sex, group=sex)) + 
+    geom_errorbar(aes(ymin=conc-ci, ymax=conc+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylim(0,27.5)+
+    ylab("Cort (ng/uL)")+ xlab("Stress series time point")+ ggtitle("Chick rearing stress series") + theme_bw()
+multiplot(p2,p4,p3,p5, cols=2) 
+
+```
+###Behavior: Exploratory data analysis
+```{r exploratory, echo=FALSE, message=FALSE, warning=FALSE}
+label=geom_text(aes(x=900, label="15 minutes\n", y=5), colour="black", angle=90, text=element_text(size=11)) #creates a label for 15 min mark
+
+ggplot(d_stress,aes(x = period ,fill = brooding_status)) + 
+    geom_bar(position = "fill")
+ggplot(d_stress, aes(x=enter_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label
+ggplot(d_stress, aes(x=brood_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label
+
+ggplot(d_stress, aes(x=restrained_m, fill=period)) + geom_histogram(alpha=0.5, binwidth = 2) 
+ggplot(d_stress, aes(x=recovered_m, fill=period)) + geom_histogram(alpha=0.5, binwidth = 2) 
+
+p1<-ggplot(d_stress, aes(y = b1_s, x = period, fill = period)) + geom_boxplot() 
+p2<-ggplot(d_stress, aes(y = b2_s, x = period, fill = period)) + geom_boxplot() 
+p3<-ggplot(d_stress, aes(y = b3_s, x = period, fill = period)) + geom_boxplot() 
+grid.arrange(p1, p2,p3, nrow = 1)
+anova(lm(b1_s~period, data=d_stress))
+anova(lm(b2_s~period, data=d_stress))
+anova(lm(b3_s~period, data=d_stress))
+
+qqPlot(d_stress$brood_s) #looks like a right skew
+d_stress$brood_s.log<-log(d_stress$brood_s) #log transform brood times
+qqPlot(d_stress$brood_s.log) #qqPlot for log transformed brood times. Improved normality!
+
+plot.design(brood_s.log ~ period + brooding_status + sex,
+            data = d_stress)
+
+#pair plot of correlational matrix
+pairs.panels(d_stress[,c(33,19,27,28,31,32)], #define the columns/variables you want to correlate using their #s
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+
+```
