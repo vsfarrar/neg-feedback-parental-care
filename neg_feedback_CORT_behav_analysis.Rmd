@@ -132,6 +132,12 @@ qqPlot(d_stress$brood_s) #looks like a right skew
 d_stress$brood_s.log<-log(d_stress$brood_s) #log transform brood times
 qqPlot(d_stress$brood_s.log) #qqPlot for log transformed brood times. Improved normality!
 
+#log transform data in long dataset
+dstress_long$brood_s.log<-log(dstress_long$brood_s) 
+qqPlot(dstress_long$conc) #cort data has some bad right skew
+dstress_long$conc.log<-log(dstress_long$conc)
+qqPlot(dstress_long$conc.log)
+
 plot.design(brood_s.log ~ period + brooding_status + sex,
             data = d_stress)
 
@@ -142,5 +148,20 @@ pairs.panels(d_stress[,c(33,19,27,28,31,32)], #define the columns/variables you 
              density = TRUE,  # show density plots
              ellipses = TRUE # show correlation ellipses
              )
+
+```
+```{r}
+#does day predict stress-induced cort?
+ggplot(d_stress, aes(x=inc_day, y=log(cort1)))+
+  geom_point(shape=1) + #hollow circles for points
+  geom_smooth(method=lm, se=TRUE) #add regression line without confidence interval shading
+
+ggplot(d_stress, aes(x=inc_day, y=log(cort2)))+
+  geom_point(shape=1) + #hollow circles for points
+  geom_smooth(method=lm, se=TRUE) #add regression line without confidence interval shading
+
+summary(lm(log(cort1)~ inc_day, data=d_stress)) #trend towards increasing baseline cort with increasing 
+summary(lm(log(cort2)~ inc_day, data=d_stress))
+summary(lm(log(cort3)~ inc_day, data=d_stress))
 
 ```
