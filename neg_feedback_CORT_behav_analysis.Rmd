@@ -4,6 +4,11 @@ author: "Victoria"
 date: "7/7/2018"
 output: html_document
 ---
+###Flaws with experimental design
+1) Range of timepoints ("early inc" = days 1 - 7) collected, rather than a specific timepoint (e.g. day 3)
+2) Human observation, rather than camera set up, may bias behavioral results
+3) Negative feedback trials may not have gone out far enough... may need to go an hour out (here is where camera may be better)
+4) Range of ages of birds (experienced versus unexperienced)
 
 ```{r data_setup, echo=FALSE}
 library(ggplot2)
