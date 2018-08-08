@@ -10,13 +10,16 @@ output: html_document
 3) Negative feedback trials may not have gone out far enough... may need to go an hour out (here is where camera may be better)
 4) Range of ages of birds (experienced versus unexperienced)
 
-```{r data_setup, echo=FALSE}
+```{r data_setup, include=FALSE}
 library(ggplot2)
-library(gridExtra)
-library(car)
-library(tidyr)
+library(cowplot) #multiple graphs in one plot, alternative to multiplot function
+library(car) #regressions
+library(tidyr) #gather
+library(dplyr) #mutate, group_by, summarize
+librarY(psych) #pairs.panel (pair plot)
+library(plotrix) #standard error calculations
 #import data into d_stress 
-d_stress<-read.csv((file.choose())) #stress_breeding_CORT_behavior.csv
+d_stress<-read.csv("~/Documents/lab/neg feedback parental care/stress_breeding_CORT_behavior.csv") #stress_breeding_CORT_behavior.csv
 #trim excess NA's at bottom of csv file
 d_stress <- d_stress[ which(d_stress$nest_ID != "NA") , ]
 #remove excessive cort values / outliers
@@ -26,7 +29,10 @@ d_stress <- d_stress[ which(d_stress$cort3 < 90) , ]
 #functions sourced from other scripts
 source("~/Documents/statistics/fxns/summarySE.R")
 source("~/Documents/statistics/fxns/summarySE_withinsubj.R")
-source("~/Documents/statistics/fxns/multiplot.R")
+#source("~/Documents/statistics/fxns/multiplot.R") #replaced with cowplot
+
+d_stress$period <- factor(d_stress$period, levels=c("early_inc", "late_inc", "chicks"))
+dstress_long$period <- factor(dstress_long$period, levels=c("early_inc", "late_inc", "chicks"))
 
 ```
 
@@ -44,6 +50,64 @@ levels(dstress_long$cort)[levels(dstress_long$cort)=="cort3"] <- "60"
 dstress_long <- dstress_long[order(dstress_long$bird_id, dstress_long$cort), ]
 ```
 
+###Behavior: Exploratory data analysis
+```{r exploratory, echo=FALSE, message=FALSE, warning=FALSE}
+label=geom_text(aes(x=900, label="15 minutes\n", y=5), colour="black", angle=90, text=element_text(size=11)) #creates a label for 15 min mark
+
+#behavior histograms
+behav1<-ggplot(d_stress, aes(x=enter_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label + scale_x_continuous(name="Time to enter (sec)", limits=c(0, 1500))
+behav2<-ggplot(d_stress, aes(x=brood_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label + scale_x_continuous(name="Time to brood (sec)", limits=c(0, 1500))
+plot_grid(behav1,behav2, rows=2, align="v")
+
+#brooding behavior by period
+brood<- d_stress %>% 
+  group_by(period,brooding_status) %>% 
+  summarise(count=n()) %>% 
+  mutate(perc=count/sum(count)) %>%
+  ggplot(aes(x = period, y = perc*100, fill = factor(brooding_status), label= round(perc*100,1))) +
+  geom_bar(colour = "black", stat="identity", width = 0.7) +
+  geom_text(position = "stack", vjust = 2)+
+  labs(x = "Period", y = "Percent", fill = "Response") +
+  ggtitle("Percent brooding by period")+
+  theme_minimal()
+print(brood)
+
+#bleeding time per blood sample, by period
+plot1<-ggplot(d_stress, aes(y = b1_s, x = period, fill = period)) + geom_boxplot() 
+plot2<-ggplot(d_stress, aes(y = b2_s, x = period, fill = period)) + geom_boxplot() 
+plot3<-ggplot(d_stress, aes(y = b3_s, x = period, fill = period)) + geom_boxplot() 
+plot_grid(plot1, plot2,plot3, cols=1)
+anova(lm(b1_s~period, data=d_stress))
+anova(lm(b2_s~period, data=d_stress))
+anova(lm(b3_s~period, data=d_stress))
+
+#qqplots for behavior
+qqPlot(d_stress$brood_s, main="Brood times (raw)") #looks like a right skew
+d_stress$brood_s.log<-log(d_stress$brood_s) #log transform brood times
+qqPlot(d_stress$brood_s.log,main="Log transformed brood times") #qqPlot for log transformed brood times. Improved normality!
+
+
+#log transform data in long dataset (CORT data)
+dstress_long$brood_s.log<-log(dstress_long$brood_s) 
+qqPlot(dstress_long$conc, main = "Cort concentrations (raw)") #cort data has some bad right skew
+dstress_long$conc.log<-log(dstress_long$conc)
+qqPlot(dstress_long$conc.log, main="Cort concentrations (log-transformed)")
+
+#design plot
+plot.design(brood_s.log ~ period + brooding_status + sex,
+            data = d_stress)
+
+#pair plot of correlational matrix
+pairs.panels(d_stress[,c(33,19,27,28,31,32)], #define the columns/variables you want to correlate using their #s
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
+
+```
+
+###Stress series
 ```{r stress series}
 #run summarySE.R function script first
 #summary statistics for dataset (used in line graphs)
@@ -110,53 +174,62 @@ p5<-ggplot(RMstat_sexC, aes(x=cort, y=conc, colour=sex, group=sex)) +
     geom_point(position=pd, size=3) +
     ylim(0,27.5)+
     ylab("Cort (ng/uL)")+ xlab("Stress series time point")+ ggtitle("Chick rearing stress series") + theme_bw()
-multiplot(p2,p4,p3,p5, cols=2) 
+plot_grid(p2,p3,p4,p5, align="h")
 
 ```
-###Behavior: Exploratory data analysis
-```{r exploratory, echo=FALSE, message=FALSE, warning=FALSE}
-label=geom_text(aes(x=900, label="15 minutes\n", y=5), colour="black", angle=90, text=element_text(size=11)) #creates a label for 15 min mark
+Fascinating! Trend towards birds that did not brood in 30 minutes after a stressor having *lower* stress-induced CORT levels than birds that did brood after the stressor. 
+This shows up in the ANOVA as well, with brooding status possibly being significant in the model for cort (p = 0.055, but with no significant interaction with series time point).   
+```{r stress series brooding status}
+#using dplyr to do what the summarySE scoped-in function does. ISSUE: does not do within-subjects control
+stat_brood<- dstress_long %>%
+  drop_na(conc)%>%
+  group_by(brooding_status,cort) %>%
+  summarize(mean=mean(conc), se=std.error(conc), ci=std.error(conc)*1.96)
 
-ggplot(d_stress,aes(x = period ,fill = brooding_status)) + 
-    geom_bar(position = "fill")
-ggplot(d_stress, aes(x=enter_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label
-ggplot(d_stress, aes(x=brood_s, fill=period)) + geom_histogram(alpha=0.5, binwidth = 100) + geom_vline(xintercept=900) + label
-
-ggplot(d_stress, aes(x=restrained_m, fill=period)) + geom_histogram(alpha=0.5, binwidth = 2) 
-ggplot(d_stress, aes(x=recovered_m, fill=period)) + geom_histogram(alpha=0.5, binwidth = 2) 
-
-p1<-ggplot(d_stress, aes(y = b1_s, x = period, fill = period)) + geom_boxplot() 
-p2<-ggplot(d_stress, aes(y = b2_s, x = period, fill = period)) + geom_boxplot() 
-p3<-ggplot(d_stress, aes(y = b3_s, x = period, fill = period)) + geom_boxplot() 
-grid.arrange(p1, p2,p3, nrow = 1)
-anova(lm(b1_s~period, data=d_stress))
-anova(lm(b2_s~period, data=d_stress))
-anova(lm(b3_s~period, data=d_stress))
-
-qqPlot(d_stress$brood_s) #looks like a right skew
-d_stress$brood_s.log<-log(d_stress$brood_s) #log transform brood times
-qqPlot(d_stress$brood_s.log) #qqPlot for log transformed brood times. Improved normality!
-
-#log transform data in long dataset
-dstress_long$brood_s.log<-log(dstress_long$brood_s) 
-qqPlot(dstress_long$conc) #cort data has some bad right skew
-dstress_long$conc.log<-log(dstress_long$conc)
-qqPlot(dstress_long$conc.log)
-
-plot.design(brood_s.log ~ period + brooding_status + sex,
-            data = d_stress)
-
-#pair plot of correlational matrix
-pairs.panels(d_stress[,c(33,19,27,28,31,32)], #define the columns/variables you want to correlate using their #s
-             method = "pearson", # correlation method
-             hist.col = "#00AFBB",
-             density = TRUE,  # show density plots
-             ellipses = TRUE # show correlation ellipses
-             )
-
+p6<-ggplot(stat_brood, aes(x=cort, y=mean, colour=brooding_status, group=brooding_status)) + 
+    geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci), width=.1, position=pd)  +
+    geom_line(position=pd) +
+    geom_point(position=pd, size=3) +
+    ylab("Cort (ng/uL)")+
+    xlab("Stress series time point") + theme_bw()
+print(p6)
 ```
-```{r}
-#does day predict stress-induced cort?
+**Note:** Currently, non-brooding birds have brood_s as "NA". Would it change the statistics if brooding birds were listed as NA?
+```{r stats}
+#cort data model
+cort<-lmer(conc.log ~ brooding_status + period + sex + cort + (1|bird_id), data=dstress_long)
+Anova(cort)
+anova(cort)
+#interaction between brooding_status and cort time point?
+cort2<-lmer(conc.log ~brooding_status*cort + (1|bird_id), data=dstress_long)
+Anova(cort2)
+
+
+#behavior data model
+behav<-lmer(brood_s.log ~ period*sex + (1|bird_id), data=dstress_long) #why is this so much more significant than the base lm? 
+Anova(behav)
+anova(behav)
+anova(lm(brood_s.log~period*sex,data=d_stress))
+
+#behavior data graphs
+ggplot(dstress_long, aes(y = brood_s.log, x = period, fill = sex)) + geom_boxplot() #boxplot
+
+# means with confidence intervals
+brood.sexXstage<-dstress_long %>%
+  drop_na(brood_s.log)%>%
+  group_by(period,sex) %>%
+  summarize(mean=mean(brood_s.log), se=std.error(brood_s.log), ci=std.error(brood_s.log)*1.96)
+
+p7<-ggplot(brood.sexXstage, aes( x=period, y=mean, colour=sex)) + 
+  geom_errorbar(aes(ymin=mean-ci, ymax=mean+ci),width=0.1, position=pd) +
+  geom_point(position=pd,size=3) +
+  ylab("Log(time to brood nest)") +
+  ylim(5,7) +
+  theme_minimal()
+print(p7)
+
+
+#does day predict stress-induced cort? Regressions
 ggplot(d_stress, aes(x=inc_day, y=log(cort1)))+
   geom_point(shape=1) + #hollow circles for points
   geom_smooth(method=lm, se=TRUE) #add regression line without confidence interval shading
@@ -165,7 +238,7 @@ ggplot(d_stress, aes(x=inc_day, y=log(cort2)))+
   geom_point(shape=1) + #hollow circles for points
   geom_smooth(method=lm, se=TRUE) #add regression line without confidence interval shading
 
-summary(lm(log(cort1)~ inc_day, data=d_stress)) #trend towards increasing baseline cort with increasing 
+summary(lm(log(cort1)~ inc_day, data=d_stress)) #weak trend towards increasing baseline cort with increasing 
 summary(lm(log(cort2)~ inc_day, data=d_stress))
 summary(lm(log(cort3)~ inc_day, data=d_stress))
 
