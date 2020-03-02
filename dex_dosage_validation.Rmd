@@ -1,0 +1,75 @@
+---
+title: "Dex Dosage Validation Pilot Results"
+date: 01-03-2020
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+#functions for graphs 
+pd<- position_dodge(0.1) # move them .05 to the left and right
+
+```
+
+```{r data setup, echo = FALSE}
+dval<-read.csv("~/Documents/projects/PRL_vs_HPA/2020-02-28_dex_validation_samples_JG_.csv")
+dval<-dval %>% separate(sample_label, c("id", "sample_no")) #separate sample label into id and timepoint 
+dval$group <- factor(dval$group, levels = c("vehicle", "dex_low", "dex_high"))
+
+#clean up data to remove outliers
+dval_trim <- dval %>%
+  filter(cort_conc < 45) #removes 2 outliers
+
+#calculate averages, sd, sem, confidence intervals 
+dval_stats<-dval_trim %>%
+  group_by(group, timepoint) %>%
+  summarise(avg_cort = mean(cort_conc), 
+            sd_cort = sd(cort_conc), 
+            se_cort = sd_cort/sqrt(length(cort_conc)),
+            lower_ci = avg_cort - 2*se_cort, 
+            upper_ci = avg_cort + 2*se_cort)
+```
+
+### Stress series 
+
+```{r individual stress series, echo = FALSE}
+#plot overall averages and confidence intervals 
+dval_stats %>% 
+  filter(group != "dex_low") %>%
+ggplot( aes(x=as.factor(timepoint), y=avg_cort, color=group, group = group)) + 
+  geom_point(position = pd)+
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), position = pd) +
+  geom_line() +
+  xlab("Timepoint (min from stressor)")+ 
+  ylab("CORT (ng/mL)")+ 
+  ggtitle("Average stress series", subtitle = "no significant differences b/w vehicle and high dex dose")+ 
+  theme_bw()
+
+
+#raw stress series by individual
+ggplot(dval, aes(x=as.factor(timepoint), y=cort_conc, color=group, group = id)) + 
+  geom_point()+
+  geom_line() + 
+  geom_text(aes(label = id), position = pd)+
+  xlab("Timepoint (min from end of 30 min acute stressor)")+ 
+  ylab("CORT (ng/mL)")+
+  ggtitle("Individual stress series")+ 
+  facet_wrap(~group)+
+  theme_bw()
+
+
+```
+
+### Statistics 
+
+```{r stats, echo = FALSE}
+#Statistics 
+dval_trim$timepoint<-as.factor(dval_trim$timepoint)
+dval_trim$timepoint<-relevel(dval_trim$timepoint, "0")
+m1<-lm(cort_conc ~ timepoint * group, dval_trim)
+summary(m1)
+anova(m1)
+
+```
+
