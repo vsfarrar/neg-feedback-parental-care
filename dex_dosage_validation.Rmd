@@ -3,6 +3,7 @@ title: "Dex Dosage Validation Pilot Results"
 date: 01-03-2020
 output: html_document
 ---
+To validate the dose of Dex to use in my negative feedback / stress series tests, I tested two doses (0.5 mg/kg and 1 mg/kg) on sample sizes of 4 non-breeding birds (each dose). Birds were placed in a bag for 30 minutes as a classic, acute stressor. After removal from the bag, I took a blood sample immediately (0 min), and then administered the vehicle or dex dose intramuscularly. I took blood samples 30, 60, and 90 min after removal from the bag and administration of the DEX. 
 
 ```{r setup, include=FALSE}
 library(tidyverse)
@@ -63,6 +64,8 @@ ggplot(dval, aes(x=as.factor(timepoint), y=cort_conc, color=group, group = id)) 
 
 ### Statistics 
 
+There were no significant differences between the vehcile and the low or high dose of DEX (due to the high variablity within the birds). 
+
 ```{r stats, echo = FALSE}
 #Statistics 
 dval_trim$timepoint<-as.factor(dval_trim$timepoint)
@@ -72,4 +75,9 @@ summary(m1)
 anova(m1)
 
 ```
+### Possible next steps?
+
+* Increase sample size of Dex validation samples?
+* Move forward with 1 mg/kg (the dose used by most Romero studies in the literature)?
+* Add a higher dose (2 mg/kg) and re-do validation?
 
