@@ -1,7 +1,9 @@
 ---
 title: "Dex Dosage Validation Pilot Results"
-date: 01-03-2020
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
+date: "01-03-2020"
 ---
 To validate the dose of Dex to use in my negative feedback / stress series tests, I tested two doses (0.5 mg/kg and 1 mg/kg) on sample sizes of 4 non-breeding birds (each dose). Birds were placed in a bag for 30 minutes as a classic, acute stressor. After removal from the bag, I took a blood sample immediately (0 min), and then administered the vehicle or dex dose intramuscularly. I took blood samples 30, 60, and 90 min after removal from the bag and administration of the DEX. 
 
