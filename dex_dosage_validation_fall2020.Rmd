@@ -1,0 +1,124 @@
+---
+title: "Dex Dosage Validation Pilot Results: Round 2"
+output:
+  html_document: default
+  pdf_document: default
+date: "2020-12-02"
+---
+After an initial pilot study (February 2020) of dexamethasone (DEX) doses did not yield conclusive suppression of CORT release and negative feedback inhibition, I extended the pilot study to run 2 higher doses. 
+The previous doses were 0.5 mg/kg and 1 mg/kg. In this pilot study (run October 2020), I used 2 mg/kg and 4 mg/kg. Birds (not actively breeding) were placed in a bag for 30 minutes as a classic acute stressor. After removal from the bag, I immediately took a blood sample (stressed, 0 min of recovery) and then administered the DEX or vehicle (0.09% physiological saline) intramuscularly. I took blood samples 30, 60, and 90 min after removal from the bag and post-administration of the injection. These samples represent the time in recovery (or after DEX/vehicle administration). 
+
+For the sake of fitting all samples on a single RIA run at the metabolomics center, I only ran the 0, 60 and 90 min samples for CORT measurements. (Measured by J.Graham and the UC Davis Metabolomics core)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+library(tidyverse)
+library(plotrix) #standard error 
+
+#functions for graphs 
+pd<- position_dodge(0.1) # move them .05 to the left and right
+
+```
+
+```{r data setup, echo = FALSE}
+dex<-read.csv("~/Documents/projects/PRL_vs_HPA/dex_dosage_validation/raw_data/dex_validation_samples_all.csv")
+
+dex <- 
+dex %>%
+separate(sample_label,into = c("id","sample"), sep = "[.]") %>%
+  mutate(group = factor(group, levels = c("vehicle", "0.5 mg/kg", "1 mg/kg", "2 mg/kg", "4 mg/kg")))
+
+
+#calculate averages, sd, sem, confidence intervals 
+dex_stats<-dex %>%
+  group_by(group, timepoint) %>%
+  summarise(n = n(), 
+            avg_cort = mean(cort), 
+            se_cort = std.error(cort),
+            lower_ci = avg_cort - 1.96*se_cort, 
+            upper_ci = avg_cort + 1.96*se_cort)
+```
+
+### Stress series 
+
+New pilot data. 
+
+```{r individual stress series, echo = FALSE}
+library(RColorBrewer)
+my.cols <- brewer.pal(5, "Reds")
+my.cols[1]<-"#000000"
+
+#overall averages and CIs
+dex_stats %>% 
+  filter(group %in% c("vehicle", "2 mg/kg", "4 mg/kg")) %>%
+ggplot( aes(x=as.factor(timepoint), y=avg_cort, color=group, group = group)) + 
+  geom_point(position = pd)+
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci), position = pd) +
+  geom_line() +
+  xlab("Timepoint (min from stressor)")+ 
+  ylab("CORT (ng/mL)")+ 
+  scale_color_manual(values = c("#000000", "#FB6A4A","#A50F15")) + 
+  annotate("text", x = 3, y = 37, label = "*", size = 7, color = "#A50F15" ) + #significance
+  annotate("text", x = 4, y = 37, label = "*", size = 7, color = "#A50F15" ) + 
+  ggtitle("Average stress series", subtitle = "Higher DEX doses reduced CORT after 60 min")+ 
+  #facet_wrap(~group)+
+  theme_bw()
+
+#raw stress series by individual
+
+dex %>% 
+  filter(group %in% c("vehicle", "2 mg/kg", "4 mg/kg")) %>%
+ggplot(aes(x=as.factor(timepoint), y=cort, color=group, group = id)) + 
+  geom_point()+
+  geom_line() + 
+  geom_text(aes(label = id), position = pd)+
+  xlab("Timepoint (min from end of 30 min acute stressor)")+ 
+  ylab("CORT (ng/mL)")+
+  scale_color_manual(values = c("#000000", "#FB6A4A","#A50F15")) + 
+  ggtitle("Individual stress series")+ 
+  facet_wrap(~group)+
+  theme_bw()
+
+
+```
+### All Pilot Data 
+
+### Statistics 
+
+2 mg/kg dose of DEX successfully lowered plasma CORT levels after 60 and 90 minutes (p < 0.05). 
+
+```{r stats, echo = FALSE}
+#Statistics 
+dex$timepoint <- as.factor(dex$timepoint)
+
+dex_new <- dex %>% filter(group %in% c("vehicle", "2 mg/kg", "4 mg/kg"))
+
+m1<-lm(cort ~ timepoint * group, dex_new)
+summary(m1)
+```
+
+Did the DEX successfully lower CORT *at the same timepoint* compared to vehicle-treated birds?
+
+Yes, 2 mg/kg treated birds had significantly lowered CORT after 60 min and 90 min than vehicle-treated birds.
+```{r dose fx by timepoint, echo = FALSE}
+min60 <- dex_new %>% filter(timepoint == "60") 
+pairwise.t.test(min60$cort, min60$group, p.adj = "holm")
+
+min90 <- dex_new %>% filter(timepoint == "90") 
+pairwise.t.test(min90$cort, min90$group, p.adj = "holm")
+```
+
+Did the DEX succesfully lower CORT compared to stressed (0 min recovery) levels?
+
+Yes, 2 mg/kg and 4 mg/kg doses significantly lowered CORT compared to those doses' average stress-induced CORT levels (0 min after stressor). 
+
+```{r timepoint fx by dose, echo = FALSE}
+lowdose <- dex %>% filter(group == "2 mg/kg")
+pairwise.t.test(lowdose$cort, lowdose$timepoint)
+
+highdose <- dex %>% filter(group == "4 mg/kg")
+pairwise.t.test(highdose$cort, highdose$timepoint)
+
+vehicle <- dex %>% filter(group == "vehicle")
+pairwise.t.test(vehicle$cort, vehicle$timepoint)
+```
